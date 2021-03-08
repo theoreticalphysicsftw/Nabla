@@ -12,35 +12,47 @@
 nbl_glsl_ext_FFT_Parameters_t nbl_glsl_ext_FFT_getParameters();
 #endif
 
-uvec3 nbl_glsl_ext_FFT_Parameters_t_getPaddedDimensions() {
+uvec3 nbl_glsl_ext_FFT_Parameters_t_getInputDimensions()
+{
     nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
-    return (params.padded_dimension.xyz);
-}
-uvec3 nbl_glsl_ext_FFT_Parameters_t_getDimensions() {
-    nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
-    return (params.dimension.xyz);
-}  
-uint nbl_glsl_ext_FFT_Parameters_t_getDirection() {
-    nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
-    return (params.dimension.w >> 16) & 0x000000ff;
+    return (params.input_dimensions.xyz);
 }
 
-uint nbl_glsl_ext_FFT_Parameters_t_getFFTLength() {
-    const uint direction = nbl_glsl_ext_FFT_Parameters_t_getDirection();
-    return nbl_glsl_ext_FFT_Parameters_t_getPaddedDimensions()[direction];
+uint nbl_glsl_ext_FFT_Parameters_t_getLog2FFTSize()
+{
+    nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
+    return params.input_dimensions.w&0x000000ffu;
+}
+uint nbl_glsl_ext_FFT_Parameters_t_getDirection()
+{
+    nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
+    return (params.input_dimensions.w>>8u)&0x3u;
+}
+uint nbl_glsl_ext_FFT_Parameters_t_getPaddingType()
+{
+    nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
+    return (params.input_dimensions.w>>10u)&0x3u;
+}
+bool nbl_glsl_ext_FFT_Parameters_t_getIsInverse()
+{
+    nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
+    return bool(params.input_dimensions.w&0x00001000u);
+}
+uint nbl_glsl_ext_FFT_Parameters_t_getNumChannels()
+{
+    nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
+    return params.input_dimensions.w>>13u;
 }
 
-bool nbl_glsl_ext_FFT_Parameters_t_getIsInverse() {
+uvec3 nbl_glsl_ext_FFT_Parameters_t_getInputStrides()
+{
     nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
-    return bool((params.dimension.w >> 8) & 0x000000ff);
+    return (params.input_strides.xyz);
 }
-uint nbl_glsl_ext_FFT_Parameters_t_getPaddingType() {
+uvec3 nbl_glsl_ext_FFT_Parameters_t_getOutputStrides()
+{
     nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
-    return (params.dimension.w) & 0x000000ff;
-}
-uint nbl_glsl_ext_FFT_Parameters_t_getNumChannels() {
-    nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
-    return (params.padded_dimension.w);
+    return (params.output_strides.xyz);
 }
 
 #endif

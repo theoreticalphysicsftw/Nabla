@@ -31,22 +31,18 @@ class FFT : public core::TotalInterface
 	public:
 		struct Parameters_t alignas(16) : nbl_glsl_ext_FFT_Parameters_t {
 		};
-
-		enum class Direction : uint8_t {
-			X = 0,
-			Y = 1,
-			Z = 2,
-		};
 		
-		enum class PaddingType : uint8_t {
+		enum class StorageType : uint8_t
+		{
+			FLOAT = 0,
+			HALF_FLOAT = 1
+		};
+		enum class PaddingType : uint8_t
+		{
+			//REPEAT = 0,
 			CLAMP_TO_EDGE = 0,
 			FILL_WITH_ZERO = 1,
-			// TODO: mirror?
-		};
-
-		enum class DataType {
-			SSBO,
-			TEXTURE2D
+			//MIRROR = 2
 		};
 
 		struct DispatchInfo_t
@@ -56,38 +52,41 @@ class FFT : public core::TotalInterface
 		};
 
 		_NBL_STATIC_INLINE_CONSTEXPR uint32_t DEFAULT_WORK_GROUP_SIZE = 256u;
-
-		// returns dispatch size and fills the uniform data
-		static inline DispatchInfo_t buildParameters(
-			asset::VkExtent3D const & paddedInputDimensions,
-			Direction direction)
+		// returns how many dispatches necessary for computing the FFT and fills the uniform data
+		static inline uint32_t buildParameters(bool isInverse, uint32_t numChannels, const asset::VkExtent3D& inputDimensions, Parameters_t* outParams, DispatchInfo_t* outInfos, const PaddingType* paddingType)
 		{
-			assert(core::isPoT(paddedInputDimensions.width) && core::isPoT(paddedInputDimensions.height) && core::isPoT(paddedInputDimensions.depth));
-			DispatchInfo_t ret = {};
+			paddedInputDimension;
 
-			ret.workGroupDims[0] = DEFAULT_WORK_GROUP_SIZE;
-			ret.workGroupDims[1] = 1;
-			ret.workGroupDims[2] = 1;
-
-			if(direction == Direction::X)
+			uint32_t passesRequired = 0u;
+			for (uint32_t i=0u; i<3u; i++)
+			if ((&inputDimensions.width)[i]>1u)
 			{
-				ret.workGroupCount[0] = 1;
-				ret.workGroupCount[1] = paddedInputDimensions.height;
-				ret.workGroupCount[2] = paddedInputDimensions.depth;
-			}
-			else if(direction == Direction::Y) {
-				ret.workGroupCount[0] = paddedInputDimensions.width;
-				ret.workGroupCount[1] = 1;
-				ret.workGroupCount[2] = paddedInputDimensions.depth;
-			}
-			else if(direction == Direction::Z)
-			{
-				ret.workGroupCount[0] = paddedInputDimensions.width;
-				ret.workGroupCount[1] = paddedInputDimensions.height;
-				ret.workGroupCount[2] = 1;
+				auto& dispatch = outInfos[passesRequired];
+				dispatch.workGroupDims[0] = DEFAULT_WORK_GROUP_SIZE;
+				dispatch.workGroupDims[1] = 1;
+				dispatch.workGroupDims[2] = 1;
+				dispatch.workGroupCount[0] = paddedInputDimensions.width;
+				dispatch.workGroupCount[1] = paddedInputDimensions.height;
+				dispatch.workGroupCount[2] = paddedInputDimensions.depth;
+				dispatch.workGroupCount[i] = 1u;
+
+				auto& params = outParams[passesRequired];
+				params.input_dimensions.x = inputDimensions.x;
+				params.input_dimensions.y = inputDimensions.y;
+				params.input_dimensions.z = inputDimensions.z;
+				{
+					params.input_dimensions.w = ;
+				}
+				params.input_strides.x = 1u;
+				params.input_strides.y = paddedInputDimensions.width;
+				params.input_strides.z = params.input_strides.y*paddedInputDimensions.height;
+				params.input_strides.w = params.input_strides.z*paddedInputDimensions.depth;
+				params.output_strides = params.input_strides;
+
+				passesRequired++;
 			}
 
-			return ret;
+			return passesRequired;
 		}
 
 		
@@ -111,10 +110,10 @@ class FFT : public core::TotalInterface
 		static core::SRange<const asset::SPushConstantRange> getDefaultPushConstantRanges();
 
 		//
-		static core::smart_refctd_ptr<video::IGPUDescriptorSetLayout> getDefaultDescriptorSetLayout(video::IVideoDriver* driver, DataType inputType);
+		static core::smart_refctd_ptr<video::IGPUDescriptorSetLayout> getDefaultDescriptorSetLayout(video::IVideoDriver* driver);
 		
 		//
-		static core::smart_refctd_ptr<video::IGPUPipelineLayout> getDefaultPipelineLayout(video::IVideoDriver* driver, DataType inputType);
+		static core::smart_refctd_ptr<video::IGPUPipelineLayout> getDefaultPipelineLayout(video::IVideoDriver* driver);
 		
 		//
 		static inline size_t getOutputBufferSize(asset::VkExtent3D const & paddedInputDimensions, uint32_t numChannels)
@@ -123,7 +122,7 @@ class FFT : public core::TotalInterface
 			return (paddedInputDimensions.width * paddedInputDimensions.height * paddedInputDimensions.depth * numChannels) * (sizeof(float) * 2);
 		}
 		
-		static core::smart_refctd_ptr<video::IGPUComputePipeline> getDefaultPipeline(video::IVideoDriver* driver, DataType inputType, uint32_t maxDimensionSize);
+		static core::smart_refctd_ptr<video::IGPUComputePipeline> getDefaultPipeline(video::IVideoDriver* driver, uint32_t maxDimensionSize);
 
 		_NBL_STATIC_INLINE_CONSTEXPR uint32_t MAX_DESCRIPTOR_COUNT = 2u;
 		static inline void updateDescriptorSet(
@@ -203,43 +202,16 @@ class FFT : public core::TotalInterface
 
 		static inline void dispatchHelper(
 			video::IVideoDriver* driver,
+			const video::IGPUPipelineLayout* pipelineLayout,
+			const Parameters_t& params,
 			const DispatchInfo_t& dispatchInfo,
 			bool issueDefaultBarrier=true)
 		{
+			driver->pushConstants(pipelineLayout,video::IGPUSpecializedShader::ESS_COMPUTE,0u,sizeof(Parameters_t),&params);
 			driver->dispatch(dispatchInfo.workGroupCount[0], dispatchInfo.workGroupCount[1], dispatchInfo.workGroupCount[2]);
 
 			if (issueDefaultBarrier)
 				defaultBarrier();
-		}
-
-		static inline void pushConstants(
-			video::IVideoDriver* driver,
-			const video::IGPUPipelineLayout * pipelineLayout,
-			asset::VkExtent3D const & inputDimension,
-			asset::VkExtent3D const & paddedInputDimension,
-			Direction direction,
-			bool isInverse, 
-			uint32_t numChannels,
-			PaddingType paddingType = PaddingType::CLAMP_TO_EDGE)
-		{
-
-			uint8_t isInverse_u8 = isInverse;
-			uint8_t direction_u8 = static_cast<uint8_t>(direction);
-			uint8_t paddingType_u8 = static_cast<uint8_t>(paddingType);
-			
-			uint32_t packed = (direction_u8 << 16u) | (isInverse_u8 << 8u) | paddingType_u8;
-
-			Parameters_t params = {};
-			params.dimension.x = inputDimension.width;
-			params.dimension.y = inputDimension.height;
-			params.dimension.z = inputDimension.depth;
-			params.dimension.w = packed;
-			params.padded_dimension.x = paddedInputDimension.width;
-			params.padded_dimension.y = paddedInputDimension.height;
-			params.padded_dimension.z = paddedInputDimension.depth;
-			params.padded_dimension.w = numChannels;
-
-			driver->pushConstants(pipelineLayout, nbl::video::IGPUSpecializedShader::ESS_COMPUTE, 0u, sizeof(Parameters_t), &params);
 		}
 
 		static void defaultBarrier();
