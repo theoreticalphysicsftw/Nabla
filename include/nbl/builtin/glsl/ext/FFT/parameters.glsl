@@ -34,6 +34,9 @@ bool nbl_glsl_ext_FFT_Parameters_t_getIsInverse() {
     nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
     return bool((params.dimension.w >> 8) & 0x000000ff);
 }
+
+#define _NBL_GLSL_EXT_FFT_CLAMP_TO_EDGE_ 0
+#define _NBL_GLSL_EXT_FFT_FILL_WITH_ZERO_ 1
 uint nbl_glsl_ext_FFT_Parameters_t_getPaddingType() {
     nbl_glsl_ext_FFT_Parameters_t params = nbl_glsl_ext_FFT_getParameters();
     return (params.dimension.w) & 0x000000ff;
