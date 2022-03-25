@@ -9,7 +9,7 @@
 
 #include "nbl/video/IGPUImageView.h"
 #include "nbl/asset/format/EFormat.h"
-#include "../../../../Nabla/source/Nabla/COpenGLExtensionHandler.h"
+//#include "../../../../Nabla/source/Nabla/COpenGLExtensionHandler.h"
 #include "nbl/builtin/glsl/ext/DepthPyramidGenerator/push_constants_struct_common.h"
 
 using namespace nbl;
@@ -60,38 +60,38 @@ public:
 
 	// inputDepthImageView - input texture
 	//outputDepthPyramidMips - array of created mipMaps
-	DepthPyramidGenerator(IVideoDriver* driver, IAssetManager* am, core::smart_refctd_ptr<IGPUImageView> inputDepthImageView,
+	DepthPyramidGenerator(ILogicalDevice* driver, IAssetManager* am, core::smart_refctd_ptr<IGPUImageView> inputDepthImageView,
 		const Config& config);
 
 	static inline uint32_t getMaxMipCntFromImage(const core::smart_refctd_ptr<IGPUImageView>& image, const Config& config)
 	{
-		const VkExtent3D lvl0MipExtent = calcLvl0MipExtent(image->getCreationParameters().image->getCreationParameters().extent, config.roundUpToPoTWithPadding);
+		const asset::VkExtent3D lvl0MipExtent = calcLvl0MipExtent(image->getCreationParameters().image->getCreationParameters().extent, config.roundUpToPoTWithPadding);
 
 		return getMaxMipCntFromLvl0Mipextent(lvl0MipExtent);
 	}
 
-	static uint32_t createMipMapImages(IVideoDriver* driver, core::smart_refctd_ptr<IGPUImageView> inputDepthImageView, core::smart_refctd_ptr<IGPUImage>* outputDepthPyramidMipImages, const Config& config);
+	static uint32_t createMipMapImages(ILogicalDevice* driver, core::smart_refctd_ptr<IGPUImageView> inputDepthImageView, core::smart_refctd_ptr<IGPUImage>* outputDepthPyramidMipImages, const Config& config);
 
-	static uint32_t createMipMapImageViews(IVideoDriver* driver, core::smart_refctd_ptr<IGPUImageView> inputDepthImageView, core::smart_refctd_ptr<IGPUImage>* inputMipImages, core::smart_refctd_ptr<IGPUImageView>* outputMips, const Config& config);
+	static uint32_t createMipMapImageViews(ILogicalDevice* driver, core::smart_refctd_ptr<IGPUImageView> inputDepthImageView, core::smart_refctd_ptr<IGPUImage>* inputMipImages, core::smart_refctd_ptr<IGPUImageView>* outputMips, const Config& config);
 
-	static core::smart_refctd_ptr<IGPUDescriptorSetLayout> createDescriptorSetLayout(IVideoDriver* driver, const Config& config);
+	static core::smart_refctd_ptr<IGPUDescriptorSetLayout> createDescriptorSetLayout(ILogicalDevice* driver, const Config& config);
 
-	static uint32_t createDescriptorSets(IVideoDriver* driver, core::smart_refctd_ptr<IGPUImageView> inputDepthImageView, core::smart_refctd_ptr<IGPUImageView>* inputDepthPyramidMips, 
+	static uint32_t createDescriptorSets(ILogicalDevice* driver, IGPUQueue* queue, IDescriptorPool* dsPool, core::smart_refctd_ptr<IGPUImageView> inputDepthImageView, core::smart_refctd_ptr<IGPUImageView>* inputDepthPyramidMips,
 		core::smart_refctd_ptr<IGPUDescriptorSetLayout>& inputDsLayout, core::smart_refctd_ptr<IGPUDescriptorSet>* outputDs, DispatchData* outputDispatchData, const Config& config);
 
-	void createPipeline(IVideoDriver* driver, core::smart_refctd_ptr<IGPUDescriptorSetLayout>& dsLayout, core::smart_refctd_ptr<IGPUComputePipeline>& outputPpln);
+	void createPipeline(ILogicalDevice* driver, core::smart_refctd_ptr<IGPUDescriptorSetLayout>& dsLayout, core::smart_refctd_ptr<IGPUComputePipeline>& outputPpln);
 
-	void generateMipMaps(const core::smart_refctd_ptr<IGPUImageView>& inputImage, core::smart_refctd_ptr<IGPUComputePipeline>& ppln, core::smart_refctd_ptr<IGPUDescriptorSet>& ds, const DispatchData& dispatchData, bool issueDefaultBarrier = true);
+	void generateMipMaps(core::smart_refctd_ptr<IGPUCommandBuffer>& cb, const core::smart_refctd_ptr<IGPUImageView>& inputImage, core::smart_refctd_ptr<IGPUComputePipeline>& ppln, core::smart_refctd_ptr<IGPUDescriptorSet>& ds, const DispatchData& dispatchData, bool issueDefaultBarrier = true);
 
 	static inline void defaultBarrier()
 	{
-		COpenGLExtensionHandler::extGlMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+		//COpenGLExtensionHandler::extGlMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT); TODO
 	}
 
 private:
-	static inline VkExtent3D calcLvl0MipExtent(const VkExtent3D& sourceImageExtent, bool roundUpToPoTWithPadding)
+	static inline asset::VkExtent3D calcLvl0MipExtent(const asset::VkExtent3D& sourceImageExtent, bool roundUpToPoTWithPadding)
 	{
-		VkExtent3D lvl0MipExtent;
+		asset::VkExtent3D lvl0MipExtent;
 
 		lvl0MipExtent.width = core::roundUpToPoT(sourceImageExtent.width);
 		lvl0MipExtent.height = core::roundUpToPoT(sourceImageExtent.height);
@@ -107,13 +107,13 @@ private:
 		return lvl0MipExtent;
 	}
 
-	static inline uint32_t getMaxMipCntFromLvl0Mipextent(VkExtent3D lvl0MipExtent)
+	static inline uint32_t getMaxMipCntFromLvl0Mipextent(asset::VkExtent3D lvl0MipExtent)
 	{
 		return core::findMSB(std::min(lvl0MipExtent.width, lvl0MipExtent.height)) + 1u;
 	}
 
 private:
-	IVideoDriver* m_driver;
+	core::smart_refctd_ptr<IUtilities> m_utilities;
 
 	const Config m_config;
 	core::smart_refctd_ptr<IGPUSpecializedShader> m_shader = nullptr;
