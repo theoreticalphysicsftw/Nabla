@@ -99,6 +99,17 @@ bool CNullDriver::genericDriverInit(asset::IAssetManager* assMgr)
 	namePrint += getName();
 	os::Printer::log(namePrint.c_str(), ELL_INFORMATION);
 
+ // up
+        {
+          auto reqs = getUpStreamingMemoryReqs();
+          reqs.vulkanReqs.size = Params.StreamingUploadBufferSize;
+          reqs.vulkanReqs.alignment =
+              64u * 1024u; // if you need larger alignments then you're not
+                           // right in the head
+          defaultUploadBuffer = core::make_smart_refctd_ptr<
+              video::StreamingTransientDataBufferMT<>>(this, reqs);
+        }
+
 	// down
 	{
 		auto reqs = getDownStreamingMemoryReqs();
@@ -106,13 +117,7 @@ bool CNullDriver::genericDriverInit(asset::IAssetManager* assMgr)
 		reqs.vulkanReqs.alignment = 64u * 1024u; // if you need larger alignments then you're not right in the head
 		defaultDownloadBuffer = core::make_smart_refctd_ptr<video::StreamingTransientDataBufferMT<> >(this, reqs);
 	}
-	// up
-	{
-		auto reqs = getUpStreamingMemoryReqs();
-		reqs.vulkanReqs.size = Params.StreamingUploadBufferSize;
-		reqs.vulkanReqs.alignment = 64u * 1024u; // if you need larger alignments then you're not right in the head
-		defaultUploadBuffer = core::make_smart_refctd_ptr < video::StreamingTransientDataBufferMT<> >(this, reqs);
-	}
+	
 
 	m_propertyPoolHandler = core::make_smart_refctd_ptr<CPropertyPoolHandler>(this,nullptr); // TODO: maybe a default logical device's pipeline cache?
 

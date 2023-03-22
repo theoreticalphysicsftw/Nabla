@@ -1148,6 +1148,7 @@ core::smart_refctd_ptr<IGPUSpecializedShader> COpenGLDriver::createGPUSpecialize
             fwrite(src, 1, glslShader_woIncludes->getSPVorGLSL()->getSize(), fl);
             fclose(fl);
         }
+       // std::cout << src << "\n";
         spirv = GLSLCompiler->compileSPIRVFromGLSL(src,stage,EP.c_str(),_specInfo.m_filePathHint.c_str());
 
         if (!spirv)

@@ -122,20 +122,20 @@ class COpenCLHandler
 
                 if (getPlatformInfoString(CL_PLATFORM_VENDOR,info.Vendor))
                     continue;
-                //printf("VENDOR = %s\n",tmpBuf);
+                printf("VENDOR = %s\n",tmpBuf);
                 if (getPlatformInfoString(CL_PLATFORM_EXTENSIONS,info.ReportedExtensions))
                     continue;
-                //printf("CL_PLATFORM_EXTENSIONS = %s\n",tmpBuf);
+                printf("CL_PLATFORM_EXTENSIONS = %s\n",tmpBuf);
                 if (getPlatformInfoString(CL_PLATFORM_NAME,info.Name))
                     continue;
-                //printf("NAME = %s\n",tmpBuf);
+                printf("NAME = %s\n",tmpBuf);
 
                 // TODO: Redo this version extraction at some point
                 {
                     size_t actualSize = 0;
                     if (CL_ERROR(ocl.pclGetPlatformInfo(platform,CL_PLATFORM_VERSION,sizeof(tmpBuf),tmpBuf,&actualSize)))
                         continue;
-                    //printf("VERSION = %s\n",tmpBuf);
+                    printf("VERSION = %s\n",tmpBuf);
                     size_t j=7;
                     for (; j<actualSize; j++)
                     {
@@ -156,7 +156,7 @@ class COpenCLHandler
                         }
                     }
                     info.Version += atoi(tmpBuf+minorStart);
-                    //printf("Parsed Version: %d\n",info.Version);
+                    printf("Parsed Version: %d\n",info.Version);
                 }
 
                 {
@@ -180,7 +180,7 @@ class COpenCLHandler
                     // get count
                     {
                         cl_uint deviceCount;
-                        if (CL_ERROR(ocl.pclGetDeviceIDs(platform,CL_DEVICE_TYPE_GPU,~0u,nullptr,&deviceCount)) || deviceCount==0u)
+                        if (CL_ERROR(ocl.pclGetDeviceIDs(platform,CL_DEVICE_TYPE_GPU,0u,nullptr,&deviceCount)) || deviceCount==0u)
                             continue;
                         info.devices.resize(deviceCount);
                     }
@@ -194,17 +194,17 @@ class COpenCLHandler
                         size_t tmpSize;
                         ocl.pclGetDeviceInfo(device,CL_DEVICE_NAME,sizeof(tmpBuf),tmpBuf,&tmpSize);
                         deviceInfoIt->Name = std::string(tmpBuf,tmpSize);
-                        //printf("Device Name: %s\n",tmpBuf);
+                        printf("Device Name: %s\n",tmpBuf);
 
                         tmpSize = 0;
                         ocl.pclGetDeviceInfo(device,CL_DEVICE_EXTENSIONS,sizeof(tmpBuf),tmpBuf,&tmpSize);
                         deviceInfoIt->ReportedExtensions = std::string(tmpBuf,tmpSize);
-                        //printf("Device Extensions: %s\n",tmpBuf);
+                        printf("Device Extensions: %s\n",tmpBuf);
 
                         ocl.pclGetDeviceInfo(device,CL_DEVICE_MAX_COMPUTE_UNITS,4,&deviceInfoIt->MaxComputeUnits,&tmpSize);
                         ocl.pclGetDeviceInfo(device,CL_DEVICE_MAX_WORK_GROUP_SIZE,8,&deviceInfoIt->MaxWorkGroupSize,&tmpSize);
                         deviceInfoIt->ProbableUnifiedShaders = deviceInfoIt->MaxComputeUnits*deviceInfoIt->MaxWorkGroupSize;
-                        //printf("Device %d has probably %d shader cores!\n",j,deviceInfoIt->ProbableUnifiedShaders);
+                       // printf("Device %d has probably %d shader cores!\n",j,deviceInfoIt->ProbableUnifiedShaders);
 
                         deviceInfoIt++;
                     }
@@ -231,9 +231,13 @@ class COpenCLHandler
             if (!alreadyEnumeratedPlatforms)
                 return false;
 
+            std::cout << "f"
+                      << "\n";
             if (!ocl_ext.pclGetGLContextInfoKHR)
                 return false;
 
+            std::cout << "f"
+                      << "\n";
             properties[0] = CL_GL_CONTEXT_KHR;
 			properties[1] = (cl_context_properties)context;
 #if defined(_NBL_WINDOWS_API_)
@@ -243,14 +247,15 @@ class COpenCLHandler
 			properties[2] = CL_GLX_DISPLAY_KHR;
 			properties[3] = (cl_context_properties)display;
 #endif
-			properties[4] = properties[5] = properties[6] = 0;
-
+   properties[4] = properties[5] = properties[6] = 0;
+           
             auto getCurrentDeviceForGL = [&properties,&outDevice]()
             {
                 size_t writeOutSize = 0;
                 auto retval = ocl_ext.pclGetGLContextInfoKHR(properties,CL_CURRENT_DEVICE_FOR_GL_CONTEXT_KHR,sizeof(cl_device_id),&outDevice,&writeOutSize);
-                if (retval!=CL_SUCCESS)
-                    return retval;
+                if (retval != CL_SUCCESS) {
+                  return retval;
+                }
                 return writeOutSize!=sizeof(cl_device_id) ? CL_INVALID_BUFFER_SIZE:CL_SUCCESS;
             };
             auto retval = getCurrentDeviceForGL();

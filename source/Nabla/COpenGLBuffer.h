@@ -54,7 +54,7 @@ class COpenGLBuffer final : public IGPUBuffer, public IDriverMemoryAllocation
             if (mreqs.mappingCapability&IDriverMemoryAllocation::EMCF_CAN_MAP_FOR_READ)
                 cachedFlags |= GL_MAP_PERSISTENT_BIT|GL_MAP_READ_BIT;
             if (mreqs.mappingCapability&IDriverMemoryAllocation::EMCF_CAN_MAP_FOR_WRITE)
-                cachedFlags |= GL_MAP_PERSISTENT_BIT|GL_MAP_WRITE_BIT;
+              cachedFlags |= GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT;
             if (mreqs.mappingCapability&IDriverMemoryAllocation::EMCF_COHERENT)
                 cachedFlags |= GL_MAP_COHERENT_BIT;
             COpenGLExtensionHandler::extGlNamedBufferStorage(BufferName,cachedMemoryReqs.vulkanReqs.size,nullptr,cachedFlags);

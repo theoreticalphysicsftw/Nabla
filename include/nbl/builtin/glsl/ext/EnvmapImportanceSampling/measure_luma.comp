@@ -21,11 +21,20 @@ void consume(in ivec2 pixelCoord, in vec2 uv, in float luma)
 	{
 		float dummy;
 		const vec3 weightedDir = nbl_glsl_sampling_envmap_directionFromUVCoord(uv,dummy)*luma;
+		#ifdef USE_SUBGROUP
 		measurement.xDirSum = nbl_glsl_workgroupAdd(weightedDir.x);
 		measurement.yDirSum = nbl_glsl_workgroupAdd(weightedDir.y);
 		measurement.zDirSum = nbl_glsl_workgroupAdd(weightedDir.z);
 		measurement.weightSum = nbl_glsl_workgroupAdd(luma);
 		measurement.maxLuma = nbl_glsl_workgroupMax(luma);
+		#else
+		measurement.xDirSum = weightedDir.x;
+		measurement.yDirSum = weightedDir.y;
+		measurement.zDirSum = weightedDir.z;
+		measurement.weightSum = luma;
+		measurement.maxLuma = luma;
+		#endif
+
 	}
 	//
 	{
