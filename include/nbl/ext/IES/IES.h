@@ -75,9 +75,26 @@ public:
     }
 
     bool parse(CIESProfile& result) {
+        // skip metadata
         std::string line;
-        std::getline(ss, line);
+        while (std::getline(ss, line)) {
+            if (line == "TILT=INCLUDE" || line == "TILT=NONE") break;
+        }
+        ss.ignore();
 
+        if (line == "TILT=INCLUDE") {
+            double lampToLuminaire = getDouble("lampToLuminaire truncated");
+            int numTilt = getDouble("numTilt truncated");
+            for (int i = 0; i < numTilt; i++)
+                getDouble("tilt angle truncated");
+            for (int i = 0; i < numTilt; i++)
+                getDouble("tilt multiplying factor truncated");
+        }
+        else if (line != "TILT=NONE") {
+            errorMsg = "TILT not specified";
+            return false;
+        }
+        
         int numLamps = getInt("numLamps truncated");
         double lumensPerLamp = getDouble("lumensPerLamp truncated");
         double candelaMultiplier = getDouble("candelaMultiplier truncated");
@@ -219,11 +236,9 @@ public:
             return {};
  
         auto meta = core::make_smart_refctd_ptr<CIESProfileMetadata>(profile.getMaxValue());
-
-        return 
+        return asset::SAssetBundle(std::move(image), { std::move(image) });
     }
 private:
-
     core::smart_refctd_ptr<asset::ICPUImage> createTexture(const CIESProfile& profile, size_t width, size_t height) {
         asset::ICPUImage::SCreationParams imgInfo;
         imgInfo.type = asset::ICPUImage::ET_2D;
@@ -234,18 +249,37 @@ private:
         imgInfo.arrayLayers = 1u;
         imgInfo.samples = asset::ICPUImage::ESCF_1_BIT;
         imgInfo.flags = static_cast<asset::IImage::E_CREATE_FLAGS>(0u);
+        imgInfo.format = asset::EF_R16_UNORM;
+        auto outImg = asset::ICPUImage::create(std::move(imgInfo));
+
+        asset::ICPUImage::SBufferCopy region;
+        size_t texelBytesz = asset::getTexelOrBlockBytesize(imgInfo.format);
+        size_t bufferRowLength = asset::IImageAssetHandlerBase::calcPitchInBlocks(width, texelBytesz);
+        region.bufferRowLength = bufferRowLength;
+        region.imageExtent = imgInfo.extent;
+        region.imageSubresource.baseArrayLayer = 0u;
+        region.imageSubresource.layerCount = 1u;
+        region.imageSubresource.mipLevel = 0u;
+        region.bufferImageHeight = 0u;
+        region.bufferOffset = 0u;
+        auto buffer = core::make_smart_refctd_ptr<asset::ICPUBuffer>(texelBytesz * bufferRowLength * height);
 
         double maxValue = profile.getMaxValue();
         double maxValueRecip = 1.0 / maxValue;
 
-        double vertAngleRate = MAX_ANGLE / height;
-        double horiAngleRate = MAX_ANGLE / width;
+        double horiAngleRate = MAX_ANGLE / height;
+        double vertAngleRate = MAX_ANGLE / width;
+        char* bufferPtr = reinterpret_cast<char*>(buffer->getPointer());
         for (size_t i = 0; i < height; i++) {
             for (size_t j = 0; j < width; j++) {
-                double I = profile.sample(i * vertAngleRate, j * horiAngleRate);
-                maxValueRecip * I
+                double I = profile.sample(i * horiAngleRate, j * vertAngleRate);
+                uint16_t value = static_cast<uint16_t>(std::clamp(I * maxValueRecip * 65535.0, 0.0, 65535.0));
+                *reinterpret_cast<uint16_t*>(bufferPtr + i * bufferRowLength + j * texelBytesz) = value;
             }
         }
+
+        outImg->setBufferAndRegions(std::move(buffer), core::make_refctd_dynamic_array<core::smart_refctd_dynamic_array<asset::IImage::SBufferCopy>>(1ull, region));
+        return outImg;
     }
 };
 
