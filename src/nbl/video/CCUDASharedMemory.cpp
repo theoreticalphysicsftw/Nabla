@@ -8,13 +8,48 @@
 namespace nbl::video
 {
 
+core::smart_refctd_ptr<IDeviceMemoryAllocation> CCUDASharedMemory::exportAsMemory(ILogicalDevice* device) const
+{
+	IDeviceMemoryAllocator::SAllocateInfo info = {
+		.size = m_params.granularSize,
+		.externalHandleType = CCUDADevice::EXTERNAL_MEMORY_HANDLE_TYPE,
+		.externalHandle = m_params.osHandle,
+	};
+
+	auto pd = device->getPhysicalDevice();
+	uint32_t memoryTypeBits = (1 << pd->getMemoryProperties().memoryTypeCount) - 1;
+	uint32_t vram = pd->getDeviceLocalMemoryTypeBits();
+
+	switch (m_params.location)
+	{
+	case CU_MEM_LOCATION_TYPE_HOST:   memoryTypeBits &= ~vram; break;
+	case CU_MEM_LOCATION_TYPE_DEVICE: memoryTypeBits &=  vram; break;
+		// TODO(Atil): Figure out how to handle these
+	case CU_MEM_LOCATION_TYPE_HOST_NUMA:
+	case CU_MEM_LOCATION_TYPE_HOST_NUMA_CURRENT:
+	default: break;
+	}
+
+	for (IDeviceMemoryAllocator::DefaultMemoryTypeIterator memTypeIt(IDeviceMemoryBacked::SDeviceMemoryRequirements{.size = m_params.granularSize,.memoryTypeBits=memoryTypeBits}, IDeviceMemoryAllocation::EMAF_NONE);
+		memTypeIt != IDeviceMemoryAllocator::IMemoryTypeIterator::end(); ++memTypeIt)
+	{
+		IDeviceMemoryAllocator::SAllocateInfo allocateInfo = memTypeIt.operator()(nullptr);
+		IDeviceMemoryAllocator::SMemoryOffset allocation = device->allocate(allocateInfo);
+		if (allocation.memory && allocation.offset != IDeviceMemoryAllocator::InvalidMemoryOffset)
+			return allocation.memory;
+	}
+	
+	return nullptr;
+}
+
+#if 0
 core::smart_refctd_ptr<IGPUBuffer> CCUDASharedMemory::exportAsBuffer(ILogicalDevice* device, core::bitflag<asset::IBuffer::E_USAGE_FLAGS> usage) const
 {
 	if (!device || !m_device->isMatchingDevice(device->getPhysicalDevice()))
 		return nullptr;
 
 	auto buf = device->createBuffer({{
-			.size = m_params.size,
+			.size = m_params.granularSize,
 			.usage = usage }, {{
 			.postDestroyCleanup = std::make_unique<CCUDADevice::SCUDACleaner>(core::smart_refctd_ptr<const CCUDASharedMemory>(this)),
 			.externalHandleTypes = CCUDADevice::EXTERNAL_MEMORY_HANDLE_TYPE,
@@ -51,7 +86,7 @@ core::smart_refctd_ptr<IGPUImage>  CCUDASharedMemory::exportAsImage(ILogicalDevi
 			.externalHandleTypes = CCUDADevice::EXTERNAL_MEMORY_HANDLE_TYPE,
 			.externalHandle = m_params.osHandle
 		}},
-		IGPUImage::ET_OPTIMAL,
+		IGPUImage::ET_LINEAR,
 		IGPUImage::EL_PREINITIALIZED,
 	});
 
@@ -60,7 +95,7 @@ core::smart_refctd_ptr<IGPUImage>  CCUDASharedMemory::exportAsImage(ILogicalDevi
 	switch (m_params.location)
 	{
 	case CU_MEM_LOCATION_TYPE_DEVICE: req.memoryTypeBits &= pd->getDeviceLocalMemoryTypeBits(); break;
-	case CU_MEM_LOCATION_TYPE_HOST: req.memoryTypeBits &= pd->getHostVisibleMemoryTypeBits(); break;
+	case CU_MEM_LOCATION_TYPE_HOST:   req.memoryTypeBits &= ~pd->getDeviceLocalMemoryTypeBits(); break;
 		// TODO(Atil): Figure out how to handle these
 	case CU_MEM_LOCATION_TYPE_HOST_NUMA:
 	case CU_MEM_LOCATION_TYPE_HOST_NUMA_CURRENT:
@@ -73,14 +108,16 @@ core::smart_refctd_ptr<IGPUImage>  CCUDASharedMemory::exportAsImage(ILogicalDevi
 	return img;
 }
 
+#endif
 CCUDASharedMemory::~CCUDASharedMemory()
 {
 	auto& cu = m_device->getHandler()->getCUDAFunctionTable();
-	auto& params = m_params;
-	cu.pcuMemUnmap(params.ptr, params.size);
-	cu.pcuMemAddressFree(params.ptr, params.size);
-	cu.pcuMemRelease(params.mem);
-	CloseHandle(params.osHandle);
+
+	CUresult re[] = {
+		cu.pcuMemUnmap(m_params.ptr, m_params.granularSize),
+	};
+	CloseHandle(m_params.osHandle);
+
 }
 }
 

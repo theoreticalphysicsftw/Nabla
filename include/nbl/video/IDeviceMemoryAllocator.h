@@ -31,6 +31,12 @@ public:
 		size_t memoryTypeIndex : 5 = 0u;
 		IDeviceMemoryBacked* dedication = nullptr; // if you make the info have a `dedication` the memory will be bound right away, also it will use VK_KHR_dedicated_allocation on vulkan
 		// size_t opaqueCaptureAddress = 0u; Note that this mechanism is intended only to support capture/replay tools, and is not recommended for use in other applications.
+		
+		// Handle Type for external resources
+		IDeviceMemoryAllocation::E_EXTERNAL_HANDLE_TYPE externalHandleType = IDeviceMemoryAllocation::EHT_NONE;
+		//! Imports the given handle  if externalHandle != nullptr && externalHandleType != EHT_NONE
+		//! Creates exportable memory if externalHandle == nullptr && externalHandleType != EHT_NONE
+		void* externalHandle = nullptr;
 	};
 
 	//! IMemoryTypeIterator extracts memoryType indices from memoryTypeBits in arbitrary order
@@ -103,13 +109,12 @@ public:
 
 	virtual SMemoryOffset allocate(const SAllocateInfo& info) = 0;
 
-	template<class memory_type_iterator_t=DefaultMemoryTypeIterator>
 	SMemoryOffset allocate(
 		const IDeviceMemoryBacked::SDeviceMemoryRequirements& reqs,
 		IDeviceMemoryBacked* dedication = nullptr,
 		const core::bitflag<IDeviceMemoryAllocation::E_MEMORY_ALLOCATE_FLAGS> allocateFlags = IDeviceMemoryAllocation::E_MEMORY_ALLOCATE_FLAGS::EMAF_NONE)
 	{
-		for(memory_type_iterator_t memTypeIt(reqs, allocateFlags); memTypeIt != IMemoryTypeIterator::end(); ++memTypeIt)
+		for(DefaultMemoryTypeIterator memTypeIt(reqs, allocateFlags); memTypeIt != IMemoryTypeIterator::end(); ++memTypeIt)
 		{
 			SAllocateInfo allocateInfo = memTypeIt.operator()(dedication);
 			SMemoryOffset allocation = allocate(allocateInfo);

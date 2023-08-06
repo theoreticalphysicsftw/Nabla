@@ -92,6 +92,7 @@ class NBL_API2 IUtilities : public core::IReferenceCounted
                 reqs.memoryTypeBits &= physicalDevice->getDownStreamingMemoryTypeBits();
 
                 auto memOffset = m_device->allocate(reqs, buffer.get(), allocateFlags);
+
                 auto mem = memOffset.memory;
 
                 core::bitflag<IDeviceMemoryAllocation::E_MAPPING_CPU_ACCESS_FLAGS> access(IDeviceMemoryAllocation::EMCAF_NO_MAPPING_ACCESS);

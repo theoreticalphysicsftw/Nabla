@@ -100,6 +100,42 @@ class IDeviceMemoryAllocation : public virtual core::IReferenceCounted
             EMHF_MULTI_INSTANCE_BIT = 0x00000002,
         };
 
+        //! Flags for imported/exported allocation
+        enum E_EXTERNAL_HANDLE_TYPE : uint32_t
+        {
+            EHT_NONE = 0,
+            EHT_OPAQUE_WIN32 = 0x00000002,
+            EHT_OPAQUE_WIN32_KMT = 0x00000004,
+            EHT_D3D11_TEXTURE = 0x00000008,
+            EHT_D3D11_TEXTURE_KMT = 0x00000010,
+            EHT_D3D12_HEAP = 0x00000020,
+            EHT_D3D12_RESOURCE = 0x00000040,
+        };
+
+        /* ExternalMemoryProperties *//* provided by VK_KHR_external_memory_capabilities */
+        struct SExternalMemoryProperties
+        {
+            uint32_t exportableTypes : 7 = ~0u;
+            uint32_t compatibleTypes : 7 = ~0u;
+            uint32_t dedicatedOnly : 1 = 0u;
+            uint32_t exportable : 1 = ~0u;
+            uint32_t importable : 1 = ~0u;
+
+            bool operator == (SExternalMemoryProperties const& rhs) const = default;
+
+            SExternalMemoryProperties operator &(SExternalMemoryProperties rhs) const
+            {
+                rhs.exportableTypes &= exportableTypes;
+                rhs.compatibleTypes &= compatibleTypes;
+                rhs.dedicatedOnly |= dedicatedOnly;
+                rhs.exportable &= exportable;
+                rhs.importable &= importable;
+                return rhs;
+            }
+        };
+
+        static_assert(sizeof(SExternalMemoryProperties) == sizeof(uint32_t));
+
         E_API_TYPE getAPIType() const;
 
         //! Utility function, tells whether the allocation can be mapped (whether mapMemory will ever return anything other than nullptr)
@@ -128,6 +164,7 @@ class IDeviceMemoryAllocation : public virtual core::IReferenceCounted
         inline core::bitflag<E_MEMORY_ALLOCATE_FLAGS> getAllocateFlags() const {return allocateFlags;}
         //!
         inline core::bitflag<E_MEMORY_PROPERTY_FLAGS> getMemoryPropertyFlags() const {return memoryPropertyFlags; }
+        inline E_EXTERNAL_HANDLE_TYPE getExternalHandleType() const {return externalHandleType; }
 
         inline bool isCurrentlyMapped() const { return mappedPtr != nullptr; }
 
@@ -157,6 +194,34 @@ class IDeviceMemoryAllocation : public virtual core::IReferenceCounted
             return true;
         }
 
+#if 0
+        void* getExternalHandle() override
+        {
+            if (m_cachedExternalHandle)
+                return m_cachedExternalHandle;
+
+            auto& ccp = getCachedCreationParams();
+
+            if (ccp.externalHandleTypes.value)
+            {
+                if (ccp.externalHandle)
+                    return m_cachedExternalHandle = ccp.externalHandle;
+
+                return m_cachedExternalHandle = getOriginDevice()->getExternalHandle(this);
+            }
+
+            return nullptr;
+        }
+
+        bool isExportableAs(E_EXTERNAL_HANDLE_TYPE type) const override
+        {
+            auto props = getOriginDevice()->getPhysicalDevice()->getExternalMemoryProperties(getCreationParams().usage, type);
+            if (!props.exportable || !(props.exportableTypes & type))
+                return false;
+            return true;
+        }
+#endif
+
     protected:
         inline void postMapSetMembers(void* ptr, MemoryRange rng, core::bitflag<E_MAPPING_CPU_ACCESS_FLAGS> access)
         {
@@ -168,21 +233,24 @@ class IDeviceMemoryAllocation : public virtual core::IReferenceCounted
         IDeviceMemoryAllocation(
             const ILogicalDevice* originDevice,
             core::bitflag<E_MEMORY_ALLOCATE_FLAGS> allocateFlags = E_MEMORY_ALLOCATE_FLAGS::EMAF_NONE,
-            core::bitflag<E_MEMORY_PROPERTY_FLAGS> memoryPropertyFlags = E_MEMORY_PROPERTY_FLAGS::EMPF_NONE)
+            core::bitflag<E_MEMORY_PROPERTY_FLAGS> memoryPropertyFlags = E_MEMORY_PROPERTY_FLAGS::EMPF_NONE,
+            E_EXTERNAL_HANDLE_TYPE externalHandleType = E_EXTERNAL_HANDLE_TYPE::EHT_NONE)
             : m_originDevice(originDevice)
             , mappedPtr(nullptr)
             , mappedRange(0,0)
             , currentMappingAccess(EMCAF_NO_MAPPING_ACCESS)
             , allocateFlags(allocateFlags)
             , memoryPropertyFlags(memoryPropertyFlags)
+            , externalHandleType(externalHandleType)
         {}
 
         const ILogicalDevice* m_originDevice = nullptr;
         uint8_t* mappedPtr;
         MemoryRange mappedRange;
         core::bitflag<E_MAPPING_CPU_ACCESS_FLAGS>    currentMappingAccess;
-        core::bitflag<E_MEMORY_ALLOCATE_FLAGS>      allocateFlags;
-        core::bitflag<E_MEMORY_PROPERTY_FLAGS>      memoryPropertyFlags;
+        core::bitflag<E_MEMORY_ALLOCATE_FLAGS>       allocateFlags;
+        core::bitflag<E_MEMORY_PROPERTY_FLAGS>       memoryPropertyFlags;
+        E_EXTERNAL_HANDLE_TYPE                       externalHandleType;
 };
 
 } // end namespace nbl::video
