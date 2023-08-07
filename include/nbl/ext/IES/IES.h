@@ -41,19 +41,27 @@ public:
     const core::vector<double>& getVertAngles() const { return vAngles; }
     size_t getHoriSize() const { return hAngles.size(); }
     size_t getVertSize() const { return vAngles.size(); }
-    double setValue(size_t i, size_t j, double val) { data[getVertSize() * i + j] = val;  }
+    void setValue(size_t i, size_t j, double val) { data[getVertSize() * i + j] = val;  }
     double getValue(size_t i, size_t j) const { return data[getVertSize() * i + j]; }
     double sample(double vAngle, double hAngle) const {
         // warp angle
         vAngle = fmod(vAngle, vAngles.back());
         hAngle = hAngles.back() == 0.0 ? 0.0 : fmod(hAngle, hAngles.back()); // when last horizontal angle is zero it's symmetric across all planes
         // bilinear interpolation
-        int i0 = std::lower_bound(std::begin(vAngles), std::end(vAngles), vAngle) - std::begin(vAngles);
-        int i1 = std::upper_bound(std::begin(vAngles), std::end(vAngles), vAngle) - std::begin(vAngles);
-        int j0 = std::lower_bound(std::begin(hAngles), std::end(hAngles), hAngle) - std::begin(hAngles);
-        int j1 = std::upper_bound(std::begin(hAngles), std::end(hAngles), hAngle) - std::begin(hAngles);
-        double u = (hAngle - hAngles[j0]) / (hAngles[j1] - hAngles[j0]);
-        double v = (vAngle - vAngles[i0]) / (vAngles[i1] - vAngles[i0]);
+        auto lb = [](const core::vector<double>& angles, double angle) -> int {
+            int idx = std::lower_bound(std::begin(angles), std::end(angles), angle) - std::begin(angles);
+            return std::min(idx, (int)angles.size() - 1);
+        };
+        auto ub = [](const core::vector<double>& angles, double angle) -> int {
+            int idx = std::upper_bound(std::begin(angles), std::end(angles), angle) - std::begin(angles);
+            return std::min(idx, (int)angles.size() - 1);
+        };
+        int j0 = lb(vAngles, vAngle);
+        int j1 = ub(vAngles, vAngle);
+        int i0 = lb(hAngles, hAngle);
+        int i1 = ub(hAngles, hAngle);
+        double u = (hAngle - hAngles[i0]) / (hAngles[i1] - hAngles[i0]);
+        double v = (vAngle - vAngles[j0]) / (vAngles[j1] - vAngles[j0]);
         double s0 = getValue(i0, j0) * (1.0 - u) + getValue(i0, j1) * u;
         double s1 = getValue(i1, j0) * (1.0 - u) + getValue(i1, j1) * u;
         return s0 * (1.0 - v) + s1 * v;
@@ -77,10 +85,12 @@ public:
     bool parse(CIESProfile& result) {
         // skip metadata
         std::string line;
+
         while (std::getline(ss, line)) {
+            if (line.back() == '\r') line.pop_back();
             if (line == "TILT=INCLUDE" || line == "TILT=NONE") break;
         }
-        ss.ignore();
+        //ss.ignore();
 
         if (line == "TILT=INCLUDE") {
             double lampToLuminaire = getDouble("lampToLuminaire truncated");
@@ -236,7 +246,7 @@ public:
             return {};
  
         auto meta = core::make_smart_refctd_ptr<CIESProfileMetadata>(profile.getMaxValue());
-        return asset::SAssetBundle(std::move(image), { std::move(image) });
+        return asset::SAssetBundle(std::move(meta), { std::move(image) });
     }
 private:
     core::smart_refctd_ptr<asset::ICPUImage> createTexture(const CIESProfile& profile, size_t width, size_t height) {
