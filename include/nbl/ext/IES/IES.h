@@ -37,6 +37,10 @@ public:
   const core::vector<double> &getHoriAngles() const { return hAngles; }
   core::vector<double> &getVertAngles() { return vAngles; }
   const core::vector<double> &getVertAngles() const { return vAngles; }
+  void addHoriAngle(double hAngle) {
+      hAngles.push_back(hAngle);
+      data.resize(getHoriSize() * getVertSize());
+  }
   size_t getHoriSize() const { return hAngles.size(); }
   size_t getVertSize() const { return vAngles.size(); }
   void setValue(size_t i, size_t j, double val) {
@@ -55,9 +59,9 @@ public:
                                          // it's symmetric across all planes
     // bilinear interpolation
     auto lb = [](const core::vector<double> &angles, double angle) -> int {
-      int idx = std::lower_bound(std::begin(angles), std::end(angles), angle) -
+      int idx = std::upper_bound(std::begin(angles), std::end(angles), angle) -
                 std::begin(angles);
-      return std::min(idx, (int)angles.size() - 1);
+      return std::max(idx-1, 0);
     };
     auto ub = [](const core::vector<double> &angles, double angle) -> int {
       int idx = std::upper_bound(std::begin(angles), std::end(angles), angle) -
@@ -72,8 +76,8 @@ public:
     double vResp = j1 == j0 ? 1.0 : 1.0 / (vAngles[j1] - vAngles[j0]);
     double u = (hAngle - hAngles[i0]) * uResp;
     double v = (vAngle - vAngles[j0]) * vResp;
-    double s0 = getValue(i0, j0) * (1.0 - v) + getValue(i0, j1) * v;
-    double s1 = getValue(i1, j0) * (1.0 - v) + getValue(i1, j1) * v;
+    double s0 = getValue(i0, j0) * (1.0-v) + getValue(i0, j1) * (v);
+    double s1 = getValue(i1, j0) * (1.0-v) + getValue(i1, j1) * (v);
     return s0 * (1.0 - u) + s1 * u;
   }
   double getMaxValue() const {
@@ -173,6 +177,14 @@ public:
       }
     }
 
+    if (hAngles.back() == 180.0) {
+        for (int i = (int)hAngles.size() - 2; i >= 0; i--) {
+            result.addHoriAngle(360.0 - hAngles[i]);
+            for (int j = 0; j < vSize; j++) 
+                result.setValue(result.getHoriSize() - 1, j, result.getValue(i, j));
+        }
+    }
+
     return !error;
   }
 
@@ -218,9 +230,10 @@ private:
 
 class CIESProfileLoader final : public asset::IAssetLoader {
 public:
-  _NBL_STATIC_INLINE_CONSTEXPR size_t TEXTURE_WIDTH = 2048;
+  _NBL_STATIC_INLINE_CONSTEXPR size_t TEXTURE_WIDTH = 1024;
   _NBL_STATIC_INLINE_CONSTEXPR size_t TEXTURE_HEIGHT = 2048;
-  _NBL_STATIC_INLINE_CONSTEXPR double MAX_ANGLE = 360.0;
+  _NBL_STATIC_INLINE_CONSTEXPR double MAX_VANGLE = 180.0;
+  _NBL_STATIC_INLINE_CONSTEXPR double MAX_HANGLE = 360.0;
 
   //! Check if the file might be loaded by this class
   /** Check might look into the file.
@@ -307,8 +320,8 @@ private:
     double maxValue = profile.getMaxValue();
     double maxValueRecip = 1.0 / maxValue;
 
-    double horiAngleRate = MAX_ANGLE / height;
-    double vertAngleRate = MAX_ANGLE / width;
+    double horiAngleRate = MAX_HANGLE / height;
+    double vertAngleRate = MAX_VANGLE / width;
     char *bufferPtr = reinterpret_cast<char *>(buffer->getPointer());
     for (size_t i = 0; i < height; i++) {
       for (size_t j = 0; j < width; j++) {
