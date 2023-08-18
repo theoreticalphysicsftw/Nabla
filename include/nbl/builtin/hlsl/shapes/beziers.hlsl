@@ -13,39 +13,29 @@ namespace hlsl
 {
 namespace shapes
 {
-    // Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
-    // GH link https://github.com/erich666/GraphicsGems/blob/master/gems/Roots3And4.c
-    // Credits to Doublefresh for hinting there
-    // returns the roots, and number of filled in real values under numRealValues
-    float2 SolveQuadratic(float3 c, out int numRealValues)
+    // will return NaN if a=b=0 because its a horizontal line
+    // otherwise returns two roots, you have one root if `retval[0]!=retval[1]`
+    // if you have no roots, both roots are NaN, so `core::isnan(retval[0])`
+    // otherwise roots are returned ordered `retval[0]<retval[1]`
+    float2 SolveQuadratic(float a, float b, float c)
     {
-        // bhaskara: x = (-b ± √(b² – 4ac)) / (2a)
-        float b = c.y / (2 * c.z);
-        float q = c.x / c.z;
-        float delta = b * b - q;
-
-        if (delta == 0.0) // Δ = 0
-        {
-            numRealValues = 1;
-            return float2(-b, 0.0);
-        }
-        if (delta < 0) // Δ < 0 (no real values)
-        {
-            numRealValues = 0;
-            return 0.0;
-        }
-
-        // Δ > 0 (two distinct real values)
-        float sqrtD = sqrt(delta);
-        numRealValues = 2;
-        return float2(sqrtD - b, sqrtD + b);
+        // assert(not_inf_or_nan(a) && not_inf_or_nan(b) && not_inf_or_nan(c));
+        // never NaN and never INF 
+        const float det = b*b-4.f*a*c;
+        // can be INF if a -> 0
+        const float rcp = 0.5f/a;
+        // can be INF if a -> 0 , NaN only if b -> 0 as well or determinant is negative
+        // plain english, NaN if no intersection or horizontal line 
+        const float detSqrt = sqrt(det)*rcp;
+        const float tmp = b*rcp;
+        return float2(-detSqrt,detSqrt)-float2(tmp,tmp);
     }
 
     struct QuadraticBezier
     {
-        float2 A;
-        float2 B;
-        float2 C;
+        float2 P0;
+        float2 P1;
+        float2 P2;
 
         static QuadraticBezier construct(float2 a, float2 b, float2 c)
         {
@@ -55,21 +45,26 @@ namespace shapes
 
         float2 evaluate(float t)
         {
-            float2 position = A * (1.0 - t) * (1.0 - t) 
-                      + 2.0 * B * (1.0 - t) * t
-                      +       C * t         * t;
+            float2 position = P0 * (1.0 - t) * (1.0 - t) 
+                      + 2.0 * P1 * (1.0 - t) * t
+                      +       P2 * t         * t;
             return position;
         }
+
+        // Quadratic coefficients from bezier points
+        float2 A() { return P0 - 2.0 * P1 + P2; }
+        float2 B() { return 2.0 * (P1 - P0); }
+        float2 C() { return P0; }
 
         // https://pomax.github.io/bezierinfo/#yforx
         float tForMajorCoordinate(const int major, float x) 
         { 
-            float a = A[major] - x;
-            float b = B[major] - x;
-            float c = C[major] - x;
-            int rootCount;
-            float2 roots = SolveQuadratic(float3(a, b, c), rootCount);
-            // assert(rootCount == 1);
+            float a = A()[major] - x;
+            float b = B()[major] - x;
+            float c = C()[major] - x;
+            float2 roots = SolveQuadratic(a, b, c);
+            // assert(roots.x == roots.y);
+            // assert(!isnan(roots.x));
             return roots.x;
         }
 
@@ -81,9 +76,9 @@ namespace shapes
             // p'(0)   = 2(B-A)
             // p'(1)   = 2(C-B)
             // p'(1/2) = 2(C-A)
-            float2 a = B - A;
-            float2 b = A - 2.0*B + C;
-            float2 c = A - pos;
+            float2 a = P1 - P0;
+            float2 b = P0 - 2.0*P1 + P2;
+            float2 c = P0 - pos;
 
             float kk = 1.0 / dot(b,b);
             float kx = kk * dot(a,b);
@@ -148,6 +143,12 @@ namespace shapes
         static QuadraticBezierOutline construct(float2 a, float2 b, float2 c, float thickness)
         {
             QuadraticBezier bezier = { a, b, c };
+            QuadraticBezierOutline ret = { bezier, thickness };
+            return ret;
+        }
+
+        static QuadraticBezierOutline construct(QuadraticBezier bezier, float thickness)
+        {
             QuadraticBezierOutline ret = { bezier, thickness };
             return ret;
         }
