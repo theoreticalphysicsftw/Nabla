@@ -241,6 +241,7 @@ struct nbl_glsl_MC_aov_t
 	nbl_glsl_MC_bxdf_spectrum_t albedo;
 	float throughputFactor; // should we have it as a full vec3 for the duration of evaluation?
 	vec3 normal;
+    vec3 motionVector;
 };
 
 // compute throughput factor from roughness
@@ -288,13 +289,14 @@ void nbl_glsl_MC_writeReg(in uint n, in vec3 v)
 }
 void nbl_glsl_MC_writeReg(in uint n, in nbl_glsl_MC_eval_pdf_aov_t v)
 {
-	nbl_glsl_MC_writeReg(n   ,v.value);
+	nbl_glsl_MC_writeReg(n,v.value);
 #ifdef GEN_CHOICE_STREAM
 	nbl_glsl_MC_writeReg(n+3u,v.pdf);
 #if GEN_CHOICE_STREAM>=GEN_CHOICE_WITH_AOV_EXTRACTION
 	nbl_glsl_MC_writeReg(n+4u,v.aov.albedo);
 	nbl_glsl_MC_writeReg(n+7u,v.aov.throughputFactor);
 	nbl_glsl_MC_writeReg(n+8u,v.aov.normal);
+	nbl_glsl_MC_writeReg(n+9u,v.aov.motionVector);
 #endif
 #endif
 }
@@ -322,6 +324,7 @@ void nbl_glsl_MC_readReg(in uint n, out nbl_glsl_MC_eval_pdf_aov_t v)
 	nbl_glsl_MC_readReg(n+4u,v.aov.albedo);
 	nbl_glsl_MC_readReg(n+7u,v.aov.throughputFactor);
 	nbl_glsl_MC_readReg(n+8u,v.aov.normal);
+	nbl_glsl_MC_readReg(n+9u,v.aov.motionVector);
 #endif
 #endif
 }
@@ -487,6 +490,7 @@ nbl_glsl_MC_eval_pdf_aov_t nbl_glsl_MC_instr_execute_COATING(
 	retval.aov.albedo = coat.aov.albedo+coated.aov.albedo*diffuse_weight;
 	retval.aov.throughputFactor = 0.f;
 	retval.aov.normal = coat.aov.normal+coated.aov.normal*diffuse_pdf;
+	retval.aov.motionVector = coat.aov.motionVector+coated.aov.motionVector*diffuse_pdf;
 #endif
 #endif
 
@@ -554,6 +558,7 @@ nbl_glsl_MC_eval_pdf_aov_t nbl_glsl_MC_instr_execute_BLEND(
 	// lazy approach to eyeballing throughput, could theoretically come up with something better/accurate
 	retval.aov.throughputFactor = mix(srcA.aov.throughputFactor,srcB.aov.throughputFactor,w_pdf);
 	retval.aov.normal = mix(srcA.aov.normal,srcB.aov.normal,w_pdf);
+	retval.aov.motionVector = mix(srcA.aov.motionVector,srcB.aov.motionVector,w_pdf);
 #endif
 #endif
 
@@ -765,6 +770,8 @@ nbl_glsl_MC_eval_pdf_aov_t nbl_glsl_MC_instr_bxdf_eval_and_pdf_common(
 	result.aov.albedo = vec3(1.f);
 	result.aov.throughputFactor = 0.f;
 	result.aov.normal = currInteraction.inner.isotropic.N;
+	result.aov.motionVector = vec3(0.f);
+	
 	if (nbl_glsl_MC_op_isDiffuse(op))
 		result.aov.albedo = nbl_glsl_MC_params_getReflectance(params);
 	else
@@ -796,6 +803,7 @@ nbl_glsl_MC_eval_pdf_aov_t nbl_glsl_MC_instr_bxdf_eval_and_pdf_common(
 		const float aovContrib = 1.f-result.aov.throughputFactor;
 		result.aov.albedo *= aovContrib;
 		result.aov.normal *= aovContrib;
+		result.aov.motionVector *= aovContrib;
 	}
 	#endif
 	#endif

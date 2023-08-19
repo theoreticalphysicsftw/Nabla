@@ -117,6 +117,7 @@ class CElementSensor : public IElement
 			IElement::operator=(other);
 			type = other.type;
 			transform = other.transform;
+			previousTransform = other.previousTransform;
 			switch (type)
 			{
 				case CElementSensor::Type::PERSPECTIVE:
@@ -155,6 +156,7 @@ class CElementSensor : public IElement
 		bool onEndTag(asset::IAssetLoader::IAssetLoaderOverride* _override, CMitsubaMetadata* globalMetadata) override;
 		IElement::Type getType() const override { return IElement::Type::SENSOR; }
 		std::string getLogName() const override { return "sensor"; }
+		core::matrix4SIMD getViewProjectionMatrix() const;
 
 		bool processChildData(IElement* _child, const std::string& name) override
 		{
@@ -190,6 +192,10 @@ class CElementSensor : public IElement
 					if (sampler.type != CElementSampler::Type::INVALID)
 						return true;
 					break;
+				case IElement::Type::SENSOR:
+					previousTransform = static_cast<CElementSensor*>(_child)->getViewProjectionMatrix();
+					return true;
+					break;
 			}
 			return false;
 		}
@@ -218,6 +224,8 @@ class CElementSensor : public IElement
 		};
 		CElementFilm	film;
 		CElementSampler	sampler;
+		core::matrix4SIMD previousTransform;
+
 };
 
 

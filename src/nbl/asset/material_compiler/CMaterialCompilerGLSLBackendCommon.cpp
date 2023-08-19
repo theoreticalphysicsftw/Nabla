@@ -1215,7 +1215,7 @@ auto CMaterialCompilerGLSLBackendCommon::compile(SContext* _ctx, IR* _ir, E_GENE
 						// TODO: investigate whether using 10-16bit storage (fixed point or half float) makes execution faster, because 
 						// albedo could fit in 1.5 DWORDs as 16bit (or 1 DWORDs as 10 bit), normal+throughput scale in 2 DWORDs as half floats or 16 bit snorm
 						// and value/pdf is a low dynamic range so half float could be feasible! Giving us a total register count of 5 DWORDs.
-						return 11u;
+						return 12u;
 						break;
 					default:
 						break;

@@ -72,6 +72,5 @@ float nbl_glsl_VT_getVTexSzRcp()
 }
 #define _NBL_USER_PROVIDED_VIRTUAL_TEXTURING_FUNCTIONS_
 
-#include <nbl/builtin/glsl/virtual_texturing/functions.glsl/7/8>
 
 #endif

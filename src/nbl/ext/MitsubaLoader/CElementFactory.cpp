@@ -56,7 +56,6 @@ CElementFactory::return_type CElementFactory::processRef(const char** _atts, Par
 	return CElementFactory::return_type(original, std::move(name));
 }
 
-
 const core::unordered_map<std::string, std::pair<CElementFactory::element_creation_func,bool>, core::CaseInsensitiveHash, core::CaseInsensitiveEquals> CElementFactory::createElementTable =
 {
 	{"integrator",	{CElementFactory::createElement<CElementIntegrator>,true}},
@@ -71,7 +70,7 @@ const core::unordered_map<std::string, std::pair<CElementFactory::element_creati
 	{"texture",		{CElementFactory::createElement<CElementTexture>,true}},
 	{"emitter",		{CElementFactory::createElement<CElementEmitter>,true}},
 	{"alias",		{CElementFactory::processAlias,true}},
-	{"ref",			{CElementFactory::processRef,true}}
+	{"ref",			{CElementFactory::processRef,true}},
 };
 
 }

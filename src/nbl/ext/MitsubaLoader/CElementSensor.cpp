@@ -223,6 +223,45 @@ bool CElementSensor::onEndTag(asset::IAssetLoader::IAssetLoaderOverride* _overri
 	return true;
 }
 
+auto convertFromXFoV = [=](float fov, float aspectRatio) -> float
+{
+	float aspectX = tan(core::radians(fov) * 0.5f);
+	return core::degrees(atan(aspectX / aspectRatio) * 2.f);
+};
+
+core::matrix4SIMD CElementSensor::getViewProjectionMatrix() const
+{
+	float realFoVDegrees = perspective.fov;
+
+	auto width = film.cropWidth;
+	auto height = film.cropHeight;
+	float aspectRatio = float(width) / float(height);
+	
+	bool cvt = false;
+
+	switch (perspective.fovAxis)
+	{
+	case PerspectivePinhole::FOVAxis::DIAGONAL: aspectRatio = core::sqrt(1.f + aspectRatio * aspectRatio);
+	case PerspectivePinhole::FOVAxis::X:		cvt = true; break;
+	case PerspectivePinhole::FOVAxis::SMALLER:  cvt = width < height; break;
+	case PerspectivePinhole::FOVAxis::LARGER:   cvt = width > height; break;
+	case ext::MitsubaLoader::CElementSensor::PerspectivePinhole::FOVAxis::Y: break;
+	default:
+		assert(false);
+		break;
+	}
+
+	if (cvt)
+		realFoVDegrees = convertFromXFoV(perspective.fov, aspectRatio);
+
+	core::matrix4SIMD projMat;
+	projMat.setTranslation(core::vectorSIMDf(perspective.shiftX, -perspective.shiftY, 0.f, 1.f));
+	projMat = core::concatenateBFollowedByA(projMat, core::matrix4SIMD::buildProjectionMatrixPerspectiveFovRH(core::radians(realFoVDegrees), float(width) / float(height), perspective.nearClip, perspective.farClip));
+
+	return core::concatenateBFollowedByA(projMat, transform.matrix);
+
+}
+
 }
 }
 }
