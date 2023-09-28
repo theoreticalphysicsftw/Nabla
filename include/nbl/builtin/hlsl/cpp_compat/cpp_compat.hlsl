@@ -22,6 +22,8 @@ using add_pointer = std::add_pointer<T>;
 #define NBL_REF_ARG(T) nbl::hlsl::add_reference<T>::type
 #define NBL_CONST_REF_ARG(T) nbl::hlsl::add_reference<std::add_const_t<T>>::type
 
+#define NBL_STATIC_ASSERT(C, M) static_assert(C, M)
+
 #else
 
 #define ARROW .arrow().
@@ -32,6 +34,9 @@ namespace nbl
 {
 namespace hlsl
 {
+
+template<typename T> struct ref {};
+template<typename T> struct ptr {};
 
 template<typename T>
 struct add_reference
@@ -49,6 +54,8 @@ struct add_pointer
 
 #define NBL_REF_ARG(T) inout T
 #define NBL_CONST_REF_ARG(T) const in T
+
+#define NBL_STATIC_ASSERT(C, M) _Static_assert(C, M)
 
 #endif
 

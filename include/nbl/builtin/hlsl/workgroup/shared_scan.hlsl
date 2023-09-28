@@ -4,7 +4,7 @@
 #ifndef _NBL_BUILTIN_HLSL_WORKGROUP_SHARED_SCAN_INCLUDED_
 #define _NBL_BUILTIN_HLSL_WORKGROUP_SHARED_SCAN_INCLUDED_
 
-#include "nbl/builtin/hlsl/cpp_compat/cpp_compat.h"
+#include "nbl/builtin/hlsl/cpp_compat/cpp_compat.hlsl"
 #include "nbl/builtin/hlsl/workgroup/broadcast.hlsl"
 #include "nbl/builtin/hlsl/glsl_compat/core.hlsl"
 #include "nbl/builtin/hlsl/glsl_compat/subgroup_basic.hlsl"

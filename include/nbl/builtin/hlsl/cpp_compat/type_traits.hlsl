@@ -129,7 +129,11 @@
 #include <nbl/builtin/hlsl/cpp_compat/vector.hlsl>
 #endif
 
-namespace nbl::hlsl::type_traits
+namespace nbl
+{
+namespace hlsl
+{
+namespace type_traits
 {
 
 namespace impl
@@ -330,5 +334,6 @@ template<class T, uint32_t N, uint32_t M>
 struct is_matrix<matrix<T, N, M> > : bool_constant<true> {};
 
 }
-
+}
+}
 #endif
